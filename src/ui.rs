@@ -13,12 +13,12 @@ use crate::app::{App, AppState};
 ///   x, y - top left coordinate
 fn display_popup_centered(frame: &mut Frame, rect: &Rect, title: &str, message: &str, prompt: &str) {
     // TODO: accept proper trait for spans, text, etc so it can be styled
-    // Compute proper size of popup. Should 
-    let width: u16 = (title.len().max(message.len() + prompt.len()) + 10) as u16;
+    // Compute proper size of popup. Add 4 to account for border and padding.
+    let width: u16 = (title.len().max(message.len() + prompt.len()) + 4) as u16;
     let height: u16 = 3;
     // Find the center of the provided rect
-    let x = (2 * rect.x + rect.width)/2 - width/2;
-    let y = (2 * rect.y + rect.height)/2 - height/2;
+    let x = (2 * rect.x + rect.width - width)/2;
+    let y = (2 * rect.y + rect.height - height)/2;
     let area = Rect::new(x, y, width, height);
     //let area = Rect::new(x, y, width, height);
     frame.render_widget(Clear, area);
@@ -97,13 +97,22 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     );
 
     // Possibly render popups depending on app state
-    if let AppState::Deleting(index) = app.state {
-        // Get the name of the session
-        let (name, _) = &app.sessions[index];
-        // Center the popup in the sessions rect
-        display_popup_centered(frame, &chunks[0], "Confirm delete?",
-            format!("Are you sure you want to delete {}?", name).as_str(),
-            " [Y]es / [N]o"
-        )
+    match app.state {
+        AppState::Deleting(index) => {
+            // Get the name of the session
+            let (name, _) = &app.sessions[index];
+            // Center the popup in the sessions rect
+            display_popup_centered(frame, &chunks[0], "Confirm Delete",
+                format!("Are you sure you want to delete {}?", name).as_str(),
+                " [Y]es / [N]o"
+            )
+        },
+        AppState::WarnNested => {
+            display_popup_centered(frame, &chunks[0], "Error",
+                "Cannot create nested session.",
+                " Press any key to continue."
+            )
+        },
+        _ => ()
     }
 }

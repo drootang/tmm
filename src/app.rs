@@ -3,6 +3,7 @@ use std::{
     collections::HashMap,
     process::Command,
     str::from_utf8,
+    env
 };
 
 /// Application result type.
@@ -12,7 +13,15 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 pub enum AppState {
     Sessions,
     Deleting(usize),
-    Renaming
+    Renaming,
+    WarnNested,
+}
+
+#[derive(Debug)]
+pub enum ExitAction {
+    AttachSession(String, bool),
+    NewSession,
+    None
 }
 
 
@@ -24,7 +33,7 @@ pub struct App {
     /// counter
     pub counter: u8,
     /// session name to attach
-    pub attach_session: Option<(String, bool)>,
+    pub on_exit: ExitAction,
 
     /// Existing Tmux sessions (name, desc)
     pub sessions: Vec<(String, String)>,
@@ -43,7 +52,7 @@ impl Default for App {
             counter: 0,
             sessions: vec![],
             selected_session: 0,
-            attach_session: None,
+            on_exit: ExitAction::None,
             state: AppState::Sessions,
         };
         def.refresh();
@@ -67,7 +76,7 @@ impl App {
 
     pub fn attach(&mut self, name: String, detach_others: bool) {
         self.running = false;
-        self.attach_session = Some((name.clone(), detach_others));
+        self.on_exit = ExitAction::AttachSession(name.clone(), detach_others);
     }
 
     pub fn increment_counter(&mut self) {
@@ -114,8 +123,8 @@ impl App {
         self.state = AppState::Deleting(index);
     }
 
-    /// Start a confirmed delete
-    pub fn cancel_delete(&mut self) {
+    /// Return to the sessions view
+    pub fn dismiss_all(&mut self) {
         self.state = AppState::Sessions;
     }
 
@@ -134,5 +143,20 @@ impl App {
         // Restore state with a refresh
         self.refresh();
         self.state = AppState::Sessions;
+    }
+
+    /// Start a new session and attach it if possible. If attach is expected to
+    /// fail, refresh list instead and stay in tmm
+    pub fn new_session(&mut self) {
+        // Create a new session
+        // Check if TMUX is set in current env
+        let envs: HashMap<String, String> = env::vars().collect();
+        if let Some(_) = envs.get("TMUX") {
+            self.state = AppState::WarnNested;
+        } else {
+            // Exit and attach new session
+            self.running = false;
+            self.on_exit = ExitAction::NewSession;
+        }
     }
 }

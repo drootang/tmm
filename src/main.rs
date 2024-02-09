@@ -6,6 +6,8 @@ use std::io;
 use ratatui::backend::CrosstermBackend;
 use ratatui::Terminal;
 
+use tmm::app::ExitAction;
+
 fn main() -> AppResult<()> {
     // Create an application.
     let mut app = App::new();
@@ -33,16 +35,22 @@ fn main() -> AppResult<()> {
     // Exit the user interface.
     tui.exit()?;
 
-    // If we need to exec to a new process (attach a tmux session), do it here
-    if let Some((name, detach_others)) = app.attach_session {
-        // Exec 
-        let mut cmd = exec::Command::new("tmux");
-        cmd.arg("a");
-        if detach_others {
-            cmd.arg("-d");
+    match app.on_exit {
+        ExitAction::AttachSession(name, detach_others) => {
+            let mut cmd = exec::Command::new("tmux");
+            cmd.arg("a");
+            if detach_others {
+                cmd.arg("-d");
+            }
+            let err = cmd.arg("-t").arg(name.as_str()).exec();
+            panic!("{}", err);
+        },
+        ExitAction::NewSession => {
+            let err = exec::Command::new("tmux")
+                .arg("new-session").exec();
+            panic!("{}", err);
         }
-        let err = cmd.arg("-t").arg(name.as_str()).exec();
-        panic!("{}", err);
+        ExitAction::None => ()
     }
     Ok(())
 }

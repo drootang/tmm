@@ -51,13 +51,18 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     // session
                     app.confirm_delete(app.selected_session);
                 }
+                KeyCode::Char('N') => {
+                    // Create and attach a new session. If the user is currently
+                    // in a tmux session so the attach would fail, instead of
+                    // attempting attach, just refresh the list
+                    app.new_session();
+                }
                 // TODO: r -> rename
-                // TODO: x -> delete
                 // TODO: d -> detach all clients from the session
                 _ => {}
             }
         },
-        AppState::Deleting(index) => {
+        AppState::Deleting(_) => {
             match key_event.code {
                 KeyCode::Char('y') => {
                     // Delete the highlighted session
@@ -65,13 +70,18 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 },
                 KeyCode::Char('n') | KeyCode::Esc => {
                     // Cancel - hide the popup
-                    app.cancel_delete();
+                    app.dismiss_all();
                 },
                 _ => (),
             }
         },
         AppState::Renaming => {
+            todo!("renaming");
         },
+        AppState::WarnNested => {
+            // Any key should dismiss
+            app.dismiss_all();
+        }
     }
     Ok(())
 }
