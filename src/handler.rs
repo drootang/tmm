@@ -57,7 +57,10 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     // attempting attach, just refresh the list
                     app.new_session();
                 }
-                // TODO: r -> rename
+                KeyCode::Char('r') => {
+                    // TODO: r -> rename
+                    todo!("rename");
+                }
                 // TODO: d -> detach all clients from the session
                 _ => {}
             }

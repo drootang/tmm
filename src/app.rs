@@ -75,8 +75,12 @@ impl App {
     }
 
     pub fn attach(&mut self, name: String, detach_others: bool) {
-        self.running = false;
-        self.on_exit = ExitAction::AttachSession(name.clone(), detach_others);
+        if Self::is_nested() {
+            self.state = AppState::WarnNested;
+        } else {
+            self.running = false;
+            self.on_exit = ExitAction::AttachSession(name.clone(), detach_others);
+        }
     }
 
     pub fn increment_counter(&mut self) {
@@ -128,6 +132,11 @@ impl App {
         self.state = AppState::Sessions;
     }
 
+    pub fn is_nested() -> bool {
+        let envs: HashMap<String, String> = env::vars().collect();
+        envs.get("TMUX").is_some()
+    }
+
     /// Delete a session
     pub fn delete(&mut self) {
         let Some((name, _)) = self.sessions.get(self.selected_session) else {
@@ -149,9 +158,7 @@ impl App {
     /// fail, refresh list instead and stay in tmm
     pub fn new_session(&mut self) {
         // Create a new session
-        // Check if TMUX is set in current env
-        let envs: HashMap<String, String> = env::vars().collect();
-        if let Some(_) = envs.get("TMUX") {
+        if Self::is_nested() {
             self.state = AppState::WarnNested;
         } else {
             // Exit and attach new session
