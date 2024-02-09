@@ -8,6 +8,14 @@ use std::{
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
+#[derive(Debug)]
+pub enum AppState {
+    Sessions,
+    Deleting(usize),
+    Renaming
+}
+
+
 /// Application.
 #[derive(Debug)]
 pub struct App {
@@ -18,12 +26,14 @@ pub struct App {
     /// session name to attach
     pub attach_session: Option<(String, bool)>,
 
-    /// Existing Tmux sessions
+    /// Existing Tmux sessions (name, desc)
     pub sessions: Vec<(String, String)>,
 
     /// Selected session index
     pub selected_session: usize,
 
+    /// The application state
+    pub state: AppState,
 }
 
 impl Default for App {
@@ -33,7 +43,8 @@ impl Default for App {
             counter: 0,
             sessions: vec![],
             selected_session: 0,
-            attach_session: None
+            attach_session: None,
+            state: AppState::Sessions,
         };
         def.refresh();
         def
@@ -96,5 +107,32 @@ impl App {
         self.sessions.iter().map(|(name, _)| {
             name.len()
         }).fold(0, |acc, x| acc.max(x))
+    }
+
+    /// Start a confirmed delete
+    pub fn confirm_delete(&mut self, index: usize) {
+        self.state = AppState::Deleting(index);
+    }
+
+    /// Start a confirmed delete
+    pub fn cancel_delete(&mut self) {
+        self.state = AppState::Sessions;
+    }
+
+    /// Delete a session
+    pub fn delete(&mut self) {
+        let Some((name, _)) = self.sessions.get(self.selected_session) else {
+            panic!("Could not identify session to delete");
+        };
+        // Kill the session
+        Command::new("tmux")
+            .args(["kill-session", "-t", name])
+            .output()
+            .expect(format!("failed to kill tmux session {}", name).as_str());
+        // TODO: check output.status and present dialog or message to user
+        // instead of just expect panic?
+        // Restore state with a refresh
+        self.refresh();
+        self.state = AppState::Sessions;
     }
 }

@@ -1,5 +1,5 @@
 use ratatui::{
-    layout::{Alignment, Layout, Direction, Constraint},
+    layout::{Alignment, Layout, Direction, Constraint, Rect},
     style::{Color, Style, Stylize, Modifier},
     widgets::*,
     text::*,
@@ -7,7 +7,33 @@ use ratatui::{
     Frame,
 };
 
-use crate::app::App;
+use crate::app::{App, AppState};
+
+/// Display a popup
+///   x, y - top left coordinate
+fn display_popup_centered(frame: &mut Frame, rect: &Rect, title: &str, message: &str, prompt: &str) {
+    // TODO: accept proper trait for spans, text, etc so it can be styled
+    // Compute proper size of popup. Should 
+    let width: u16 = (title.len().max(message.len() + prompt.len()) + 10) as u16;
+    let height: u16 = 3;
+    // Find the center of the provided rect
+    let x = (2 * rect.x + rect.width)/2 - width/2;
+    let y = (2 * rect.y + rect.height)/2 - height/2;
+    let area = Rect::new(x, y, width, height);
+    //let area = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, area);
+    // Configure a block to place the confirm message in
+    let popup_block = Block::default()
+        .title(title)
+        .borders(Borders::ALL)
+        .padding(Padding::horizontal(1))
+        .style(Style::default().bg(Color::DarkGray));
+    // Create the message inside the popup_block
+    let msg = Paragraph::new(format!("{}{}", message, prompt))
+            .block(popup_block);
+    // Render
+    frame.render_widget(msg, area);
+}
 
 /// Renders the user interface widgets.
 pub fn render(app: &mut App, frame: &mut Frame) {
@@ -68,5 +94,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .block(Block::default().title("Hotkeys").borders(Borders::ALL))
 
         , chunks[1]
-    )
+    );
+
+    // Possibly render popups depending on app state
+    if let AppState::Deleting(index) = app.state {
+        // Get the name of the session
+        let (name, _) = &app.sessions[index];
+        // Center the popup in the sessions rect
+        display_popup_centered(frame, &chunks[0], "Confirm delete?",
+            format!("Are you sure you want to delete {}?", name).as_str(),
+            " [Y]es / [N]o"
+        )
+    }
 }
