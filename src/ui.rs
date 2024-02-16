@@ -113,6 +113,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 " Press any key to continue."
             )
         },
+        AppState::Renaming(index) => {
+            // Render text input dialog to get the desired new name
+            if let Some(name) = &app.new_session_name {
+                display_popup_centered(frame, &chunks[0], "Rename", &name, "");
+            }
+        }
         _ => ()
     }
 }

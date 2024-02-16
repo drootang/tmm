@@ -1,9 +1,5 @@
 use std::{
-    error,
-    collections::HashMap,
-    process::Command,
-    str::from_utf8,
-    env
+    collections::HashMap, env, error, fmt::write, process::Command, str::from_utf8
 };
 
 /// Application result type.
@@ -13,7 +9,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 pub enum AppState {
     Sessions,
     Deleting(usize),
-    Renaming,
+    Renaming(usize),
     WarnNested,
 }
 
@@ -43,6 +39,9 @@ pub struct App {
 
     /// The application state
     pub state: AppState,
+
+    /// Rename string
+    pub new_session_name: Option<String>,
 }
 
 impl Default for App {
@@ -54,6 +53,7 @@ impl Default for App {
             selected_session: 0,
             on_exit: ExitAction::None,
             state: AppState::Sessions,
+            new_session_name: None,
         };
         def.refresh();
         def
@@ -125,6 +125,11 @@ impl App {
     /// Start a confirmed delete
     pub fn confirm_delete(&mut self, index: usize) {
         self.state = AppState::Deleting(index);
+    }
+
+    /// Start a confirmed rename
+    pub fn confirm_rename(&mut self, index: usize) {
+        self.state = AppState::Renaming(index);
     }
 
     /// Return to the sessions view
