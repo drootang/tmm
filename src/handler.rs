@@ -29,14 +29,32 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // keys
     match app.state {
         AppState::Sessions | AppState::SessionsSearch(_) => {
+            /* // Reference on how to move modifiers into the match instead of a 
+               // secondary check
+            match key_event {
+                KeyEvent{code: KeyCode::Char('k'), modifiers: KeyModifiers::CONTROL, ..} => {
+                    panic!("you pressed k");
+                },
+                _ => ()
+            } */
             match key_event.code {
                 // Move up the list
                 KeyCode::Char('k') | KeyCode::Up => {
                     app.selected_session = app.selected_session.checked_sub(1).unwrap_or(0)
                 }
+                KeyCode::Char('p') => { // C-p
+                    if key_event.modifiers == KeyModifiers::CONTROL {
+                        app.selected_session = app.selected_session.checked_sub(1).unwrap_or(0)
+                    }
+                }
                 // Move down the list
                 KeyCode::Char('j') | KeyCode::Down => {
                     app.selected_session = (app.selected_session + 1).min(app.sessions.len()-1)
+                }
+                KeyCode::Char('n') => { // C-n
+                    if key_event.modifiers == KeyModifiers::CONTROL {
+                        app.selected_session = (app.selected_session + 1).min(app.sessions.len()-1)
+                    }
                 }
                 // Enter/select to attach
                 KeyCode::Enter | KeyCode::Char('a') => {
