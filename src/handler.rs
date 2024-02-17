@@ -64,7 +64,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 }
                 KeyCode::Char('r') => {
                     // TODO: r -> rename
-                    app.confirm_rename(app.selected_session);
+                    app.confirm_rename();
                 }
                 // TODO: d -> detach all clients from the session
                 _ => {}

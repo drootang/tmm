@@ -1,12 +1,11 @@
 use ratatui::{
-    layout::{Alignment, Layout, Direction, Constraint, Rect},
-    style::{Color, Style, Stylize, Modifier},
+    layout::{Layout, Direction, Constraint, Rect},
+    style::{Color, Style, Stylize},
     widgets::*,
     text::*,
-    symbols,
     Frame,
 };
-use tui_textarea::{Input, Key, TextArea};
+use tui_textarea::TextArea;
 
 use crate::app::{App, AppState};
 

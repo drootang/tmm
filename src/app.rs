@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, env, error, fmt::write, process::Command, str::from_utf8
+    collections::HashMap, env, error, process::Command, str::from_utf8
 };
 use tui_textarea::TextArea;
 use ratatui::style::{Color, Style};
@@ -161,7 +161,7 @@ impl<'a> App<'a> {
     }
 
     /// Start a confirmed rename
-    pub fn confirm_rename(&mut self, index: usize) {
+    pub fn confirm_rename(&mut self) {
         // Create the textarea and switch to renaming state
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
