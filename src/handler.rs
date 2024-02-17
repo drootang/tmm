@@ -8,7 +8,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // of mode
 
     // As long as the state is not Renaming, check the globals first
-    if !matches!(app.state, AppState::Renaming) {
+    if !matches!(app.state, AppState::Renaming | AppState::SessionsSearch) {
         match key_event.code {
             // Exit application on `ESC` or `q`
             KeyCode::Char('q') => {
@@ -28,15 +28,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // Check hotkeys based on different app states that can handle different
     // keys
     match app.state {
-        AppState::Sessions | AppState::SessionsSearch(_) => {
-            /* // Reference on how to move modifiers into the match instead of a 
-               // secondary check
-            match key_event {
-                KeyEvent{code: KeyCode::Char('k'), modifiers: KeyModifiers::CONTROL, ..} => {
-                    panic!("you pressed k");
-                },
-                _ => ()
-            } */
+        AppState::Sessions => {
             match key_event.code {
                 // Move up the list
                 KeyCode::Char('k') | KeyCode::Up => {
@@ -81,11 +73,54 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     app.new_session();
                 }
                 KeyCode::Char('r') => {
-                    // TODO: r -> rename
                     app.confirm_rename();
+                }
+                KeyCode::Char('/') => {
+                    app.search();
                 }
                 // TODO: d -> detach all clients from the session
                 _ => {}
+            }
+        },
+        AppState::SessionsSearch => {
+            match key_event.into() {
+                Input { key: Key::Enter, .. } => {
+                    // Update selected session with first search result
+                    if let Some(new_row) = app.search_session_selected {
+                        app.selected_session = new_row;
+                    }
+                    app.dismiss_all();
+                },
+                Input { key: Key::Esc, .. } => {
+                    // Ensure no search session is selected
+                    app.search_session_selected = None;
+                    app.dismiss_all();
+                },
+                Input { key: Key::Char('p'), ctrl: true, .. } => {
+                    if let Some(selected_row) = app.search_session_selected {
+                        if let Some(cur_idx) = app.matching_rows.iter().position(|row_idx| {
+                            *row_idx == selected_row
+                        }) {
+                            let new_idx = cur_idx.checked_sub(1).unwrap_or(0);
+                            app.search_session_selected = Some(app.matching_rows[new_idx]);
+                        }
+                    }
+                },
+                Input { key: Key::Char('n'), ctrl: true, .. } => {
+                    if let Some(selected_row) = app.search_session_selected {
+                        if let Some(cur_idx) = app.matching_rows.iter().position(|row_idx| {
+                            *row_idx == selected_row
+                        }) {
+                            let new_idx = (cur_idx + 1).min(app.matching_rows.len()-1);
+                            app.search_session_selected = Some(app.matching_rows[new_idx]);
+                        }
+                    }
+                },
+                input => {
+                    if let Some(ref mut textarea) = app.search_session_ta {
+                        textarea.input(input);
+                    }
+                }
             }
         },
         AppState::Deleting => {

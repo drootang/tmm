@@ -59,11 +59,76 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     // we will use a stateful list where the list is 1 item per tmux session.
     // Highlight the selected session.
     
-    // app.sessions is a vector of (name, desc). We want to join name and desc
+    // app.sessions is a vector of (name, desc). We want to join name and desc.
     let width = app.max_session_name_width();
-    let items: Vec<String> = app.sessions.iter().map(|(name, desc)| {
+
+    // Set up the list state including selected row
+    let mut state = ListState::default();
+    state.select(Some(app.selected_session));
+
+    // Compute the strings that will be displayed (one per row)
+    let item_strings: Vec<String> = app.sessions.iter().map(|(name, desc)| {
         format!("{:>2$}: {}", name, desc, width)
     }).collect();
+
+    let items: Vec<ListItem> = match app.state {
+        AppState::SessionsSearch => {
+            // If searching, filter/modify the items based on the current search string
+            let search_needle = &app.search_session_ta.as_ref().expect("Could not get search term").lines()[0];
+            let mut row_idx = 0;
+            app.matching_rows.clear();
+            let mapped_strings = item_strings.iter().map(|row| {
+                // For each string, find any/all matches and convert result into a vec of spans
+                let mut spans: Vec<Span> = vec![];
+                let mut idx = 0;
+                let mut matched = false;
+                if !search_needle.is_empty() {
+                    for (jdx, _) in row.match_indices(search_needle) {
+                        spans.push(Span::raw(row[idx..jdx].to_owned()));
+                        spans.push(Span::styled(search_needle.to_owned(), Style::default().fg(Color::Magenta)));
+                        idx = jdx + search_needle.len();
+                        matched = true;
+                    }
+                }
+                if matched {
+                    app.matching_rows.push(row_idx);
+                }
+                if idx < row.len() {
+                    spans.push(Span::raw(row[idx..].to_owned()));
+                }
+                row_idx += 1;
+                ListItem::new(Line::from(spans))
+            }).collect();
+            // If there is already a desired selection among matches
+            if let Some(selected_match) = app.search_session_selected {
+                // There is already a requested selected match. Only keep it if that row is in the
+                // current vector of matching rows. If it is not, it means the user changed the
+                // needle and their desired row no longer matches. In that case, use the first
+                // matching row as the new selection. If the selected matches is empty, select
+                // nothing.
+                if app.matching_rows.is_empty() {
+                    app.search_session_selected = None;
+                }
+                else if !app.matching_rows.contains(&selected_match) {
+                    app.search_session_selected = Some(app.matching_rows[0])
+                }
+            }
+            else if let Some(first_match) = app.matching_rows.get(0) {
+                // There is no current desired selection among matches. Use the first match or none
+                // if there are no matches
+                app.search_session_selected = Some(*first_match);
+            } else {
+                app.search_session_selected = None;
+            }
+            state.select(app.search_session_selected);
+            mapped_strings
+        }
+        _ => {
+            item_strings.iter().map(|s| {
+                ListItem::new(s.to_owned())
+            }).collect()
+        }
+    };
 
     /**********/
     /* LAYOUT */
@@ -83,10 +148,6 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     /* SESSIONS LIST */
     /*****************/
 
-    // Set up the list state including selected row
-    let mut state = ListState::default();
-    state.select(Some(app.selected_session));
-
     frame.render_stateful_widget(
         List::new(items)
             .block(
@@ -94,9 +155,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                     .title(" Tmux Session Manager ")
                     .padding(Padding::uniform(1))
             )
-            //.style(Style::default())
             .highlight_style(Style::default().fg(Color::Cyan).reversed())
             .highlight_symbol(">> ")
+            .highlight_spacing(HighlightSpacing::Always)
             .repeat_highlight_symbol(false)
             .direction(ListDirection::TopToBottom),
         chunks[0], &mut state
@@ -116,17 +177,30 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 format!("Are you sure you want to delete {}?", name).as_str(),
                 " [Y]es / [N]o"
             )
-        },
+        }
         AppState::WarnNested => {
             display_popup_centered(frame, &chunks[0], "Error",
                 "Cannot create nested session.",
                 " [D]ismiss"
             )
-        },
+        }
         AppState::Renaming => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.new_session_ta {
                 display_prompt_centered(frame, &chunks[0], textarea)
+            }
+        }
+        AppState::SessionsSearch => {
+            // Render text input dialog to get the desired new name
+            if let Some(textarea) = &app.search_session_ta {
+                // Need to render the search prompt immediately after the sessions list
+                // Compute the rect
+                let Rect{x, y, width, height} = chunks[0];
+                let prompt_rect = Rect::new(x+2, y+height-2, width-2, 1);
+                let search_rect = Rect::new(x+4, y+height-2, width-4, 1);
+                frame.render_widget(Clear, search_rect);
+                frame.render_widget(textarea.widget(), search_rect);
+                frame.render_widget(Span::styled("> ", Style::new().fg(Color::Cyan)), prompt_rect);
             }
         }
         _ => ()

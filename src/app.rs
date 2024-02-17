@@ -12,7 +12,7 @@ pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 #[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum AppState {
     Sessions,
-    SessionsSearch(String),
+    SessionsSearch,
     Deleting,
     Renaming,
     WarnNested,
@@ -35,19 +35,20 @@ pub struct App<'a> {
     pub counter: u8,
     /// session name to attach
     pub on_exit: ExitAction,
-
     /// Existing Tmux sessions (name, desc)
     pub sessions: Vec<(String, String)>,
-
     /// Selected session index
     pub selected_session: usize,
-
     /// The application state
     pub state: AppState,
-
     /// Rename string
     pub new_session_ta: Option<TextArea<'a>>,
-
+    /// Rename string
+    pub search_session_ta: Option<TextArea<'a>>,
+    /// The row selected by a search operation
+    pub search_session_selected: Option<usize>,
+    /// All row indexes that match current search terms
+    pub matching_rows: Vec<usize>,
     /// hotkey bar
     pub hotkeys: HashMap<AppState, IndexMap<&'a str, &'a str>>,
 }
@@ -62,6 +63,9 @@ impl<'a> Default for App<'a> {
             on_exit: ExitAction::None,
             state: AppState::Sessions,
             new_session_ta: None,
+            search_session_ta: None,
+            search_session_selected: None,
+            matching_rows: vec![],
             hotkeys: [
                 (AppState::Sessions, [
                     ("Q", "Quit"),
@@ -70,7 +74,7 @@ impl<'a> Default for App<'a> {
                     ("J", "Down"),
                     ("K", "Up"),
                     ("X", "Delete"),
-                    ("H", "Hotkeys"),
+                    ("/", "Search"),
                 ].iter().cloned().collect()),
                 (AppState::Deleting, [
                     ("Q", "Quit"),
@@ -85,6 +89,12 @@ impl<'a> Default for App<'a> {
                 (AppState::WarnNested, [
                     ("Q", "Quit"),
                     ("Any", "Dismiss"),
+                ].iter().cloned().collect()),
+                (AppState::SessionsSearch, [
+                    ("Esc", "Cancel"),
+                    ("Enter", "Confirm"),
+                    ("C-n", "Select next match"),
+                    ("C-p", "Select previous match"),
                 ].iter().cloned().collect()),
             ].iter().cloned().collect(),
         };
@@ -175,9 +185,20 @@ impl<'a> App<'a> {
         self.state = AppState::Renaming;
     }
 
+    /// Start searching
+    pub fn search(&mut self) {
+        // Create the textarea and switch to renaming state
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(Style::default());
+        textarea.set_style(Style::default().fg(Color::DarkGray));
+        self.search_session_ta = Some(textarea);
+        self.state = AppState::SessionsSearch;
+    }
+
     /// Return to the sessions view
     pub fn dismiss_all(&mut self) {
         self.new_session_ta = None;
+        self.search_session_ta = None;
         self.state = AppState::Sessions;
     }
 
