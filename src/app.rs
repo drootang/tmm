@@ -1,15 +1,20 @@
 use std::{
     collections::HashMap, env, error, fmt::write, process::Command, str::from_utf8
 };
+use tui_textarea::TextArea;
+use ratatui::style::{Color, Style};
+use ratatui::widgets::*;
+use indexmap::IndexMap;
 
 /// Application result type.
 pub type AppResult<T> = std::result::Result<T, Box<dyn error::Error>>;
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq, Hash, Clone)]
 pub enum AppState {
     Sessions,
-    Deleting(usize),
-    Renaming(usize),
+    SessionsSearch(String),
+    Deleting,
+    Renaming,
     WarnNested,
 }
 
@@ -23,7 +28,7 @@ pub enum ExitAction {
 
 /// Application.
 #[derive(Debug)]
-pub struct App {
+pub struct App<'a> {
     /// Is the application running?
     pub running: bool,
     /// counter
@@ -41,10 +46,13 @@ pub struct App {
     pub state: AppState,
 
     /// Rename string
-    pub new_session_name: Option<String>,
+    pub new_session_ta: Option<TextArea<'a>>,
+
+    /// hotkey bar
+    pub hotkeys: HashMap<AppState, IndexMap<&'a str, &'a str>>,
 }
 
-impl Default for App {
+impl<'a> Default for App<'a> {
     fn default() -> Self {
         let mut def = Self {
             running: true,
@@ -53,14 +61,39 @@ impl Default for App {
             selected_session: 0,
             on_exit: ExitAction::None,
             state: AppState::Sessions,
-            new_session_name: None,
+            new_session_ta: None,
+            hotkeys: [
+                (AppState::Sessions, [
+                    ("Q", "Quit"),
+                    ("A", "Attach Session"),
+                    ("R", "Rename"),
+                    ("J", "Down"),
+                    ("K", "Up"),
+                    ("X", "Delete"),
+                    ("H", "Hotkeys"),
+                ].iter().cloned().collect()),
+                (AppState::Deleting, [
+                    ("Q", "Quit"),
+                    ("Esc", "Back"),
+                    ("Y", "Delete"),
+                    ("N", "Cancel"),
+                ].iter().cloned().collect()),
+                (AppState::Renaming, [
+                    ("Esc", "Back"),
+                    ("Enter", "Rename"),
+                ].iter().cloned().collect()),
+                (AppState::WarnNested, [
+                    ("Q", "Quit"),
+                    ("Any", "Dismiss"),
+                ].iter().cloned().collect()),
+            ].iter().cloned().collect(),
         };
         def.refresh();
         def
     }
 }
 
-impl App {
+impl<'a> App<'a> {
     /// Constructs a new instance of [`App`].
     pub fn new() -> Self {
         Self::default()
@@ -123,23 +156,51 @@ impl App {
     }
 
     /// Start a confirmed delete
-    pub fn confirm_delete(&mut self, index: usize) {
-        self.state = AppState::Deleting(index);
+    pub fn confirm_delete(&mut self) {
+        self.state = AppState::Deleting;
     }
 
     /// Start a confirmed rename
     pub fn confirm_rename(&mut self, index: usize) {
-        self.state = AppState::Renaming(index);
+        // Create the textarea and switch to renaming state
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(Style::default());
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" New Session Name ")
+                .style(Style::default().bg(Color::DarkGray))
+        );
+        self.new_session_ta = Some(textarea);
+        self.state = AppState::Renaming;
     }
 
     /// Return to the sessions view
     pub fn dismiss_all(&mut self) {
+        self.new_session_ta = None;
         self.state = AppState::Sessions;
     }
 
     pub fn is_nested() -> bool {
         let envs: HashMap<String, String> = env::vars().collect();
         envs.get("TMUX").is_some()
+    }
+
+    /// Rename selected session
+    pub fn rename(&mut self, rename: &str) {
+        let Some((name, _)) = self.sessions.get(self.selected_session) else {
+            panic!("Could not identify session to delete");
+        };
+        let proc = Command::new("tmux")
+            .args(["rename-session", "-t", name, rename])
+            .output()
+            .expect(format!("failed to rename tmux session {}", name).as_str());
+        if !proc.status.success() {
+            panic!("This is the failure message: {}", std::str::from_utf8(&proc.stderr).unwrap());
+            // TODO: display popup with error
+        }
+        self.refresh();
+        self.dismiss_all();
     }
 
     /// Delete a session
@@ -156,7 +217,7 @@ impl App {
         // instead of just expect panic?
         // Restore state with a refresh
         self.refresh();
-        self.state = AppState::Sessions;
+        self.dismiss_all();
     }
 
     /// Start a new session and attach it if possible. If attach is expected to

@@ -6,6 +6,7 @@ use ratatui::{
     symbols,
     Frame,
 };
+use tui_textarea::{Input, Key, TextArea};
 
 use crate::app::{App, AppState};
 
@@ -24,7 +25,7 @@ fn display_popup_centered(frame: &mut Frame, rect: &Rect, title: &str, message: 
     frame.render_widget(Clear, area);
     // Configure a block to place the confirm message in
     let popup_block = Block::default()
-        .title(title)
+        .title(format!(" {} ", title))
         .borders(Borders::ALL)
         .padding(Padding::horizontal(1))
         .style(Style::default().bg(Color::DarkGray));
@@ -33,6 +34,19 @@ fn display_popup_centered(frame: &mut Frame, rect: &Rect, title: &str, message: 
             .block(popup_block);
     // Render
     frame.render_widget(msg, area);
+}
+
+fn display_prompt_centered(frame: &mut Frame, rect: &Rect, textarea: &TextArea) {
+    // TODO: accept proper trait for spans, text, etc so it can be styled
+    // Compute proper size of popup. Add 4 to account for border and padding.
+    let width: u16 = (textarea.lines()[0].len()+4).max(18).max((rect.width/2) as usize) as u16;
+    let height: u16 = 3;
+    // Find the center of the provided rect
+    let x = (2 * rect.x + rect.width - width)/2;
+    let y = (2 * rect.y + rect.height - height)/2;
+    let area = Rect::new(x, y, width, height);
+    frame.render_widget(Clear, area);
+    frame.render_widget(textarea.widget(), area);
 }
 
 /// Renders the user interface widgets.
@@ -52,35 +66,35 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         format!("{:>2$}: {}", name, desc, width)
     }).collect();
 
-    // Modify the list to set one of the ListItems to have another row and do
-    // what we want
-    //let mut items: Vec<ListItem> = items.iter().map(|x| ListItem::new(x.as_str())).collect();
-    /*
-    // Modify the first tiem to replace it with some stylized text
-    items[0] = Line::from(vec![
-        Span::raw("This is a "),
-        Span::styled("new", Style::default().fg(Color::Green)),
-        Span::raw(" test!"),
-    ]).into();
-    */
-    //
-    // Set up the list state
-    let mut state = ListState::default();
-    state.select(Some(app.selected_session));
+    /**********/
+    /* LAYOUT */
+    /**********/
 
     // Split the screen to create layout sections/chunks
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
             Constraint::Min(4 + app.sessions.len() as u16),
-            Constraint::Length(3),
+            Constraint::Length(1),
             Constraint::Percentage(100),
         ])
         .split(frame.size());
 
+    /*****************/
+    /* SESSIONS LIST */
+    /*****************/
+
+    // Set up the list state including selected row
+    let mut state = ListState::default();
+    state.select(Some(app.selected_session));
+
     frame.render_stateful_widget(
         List::new(items)
-            .block(Block::default().title(" Tmux Session Manager ").borders(Borders::ALL).padding(Padding::uniform(1)))
+            .block(
+                Block::bordered()
+                    .title(" Tmux Session Manager ")
+                    .padding(Padding::uniform(1))
+            )
             //.style(Style::default())
             .highlight_style(Style::default().fg(Color::Cyan).reversed())
             .highlight_symbol(">> ")
@@ -88,19 +102,16 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .direction(ListDirection::TopToBottom),
         chunks[0], &mut state
     );
-
-    frame.render_widget(
-        Paragraph::new("  A: A hotkey  B: B hotkey")
-            .block(Block::default().title("Hotkeys").borders(Borders::ALL))
-
-        , chunks[1]
-    );
+    
+    /**********/
+    /* POPUPS */
+    /**********/
 
     // Possibly render popups depending on app state
     match app.state {
-        AppState::Deleting(index) => {
+        AppState::Deleting => {
             // Get the name of the session
-            let (name, _) = &app.sessions[index];
+            let (name, _) = &app.sessions[app.selected_session];
             // Center the popup in the sessions rect
             display_popup_centered(frame, &chunks[0], "Confirm Delete",
                 format!("Are you sure you want to delete {}?", name).as_str(),
@@ -110,15 +121,38 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         AppState::WarnNested => {
             display_popup_centered(frame, &chunks[0], "Error",
                 "Cannot create nested session.",
-                " Press any key to continue."
+                " [D]ismiss"
             )
         },
-        AppState::Renaming(index) => {
+        AppState::Renaming => {
             // Render text input dialog to get the desired new name
-            if let Some(name) = &app.new_session_name {
-                display_popup_centered(frame, &chunks[0], "Rename", &name, "");
+            if let Some(textarea) = &app.new_session_ta {
+                display_prompt_centered(frame, &chunks[0], textarea)
             }
         }
         _ => ()
     }
+
+    /***********/
+    /* HOTKEYS */
+    /***********/
+
+    // Get hotkeys by app state and map them to styled spans
+    let hotkey_spans: Vec<Span> = match &app.hotkeys.get(&app.state) {
+        // Get the hotkey map if it exists for this state
+        Some(hotkeys) => hotkeys,
+        // Use the Sessions state as a default if the current state does not have custom hotkeys
+        // defined
+        _ => app.hotkeys.get(&AppState::Sessions).expect("Could not get sessions hotkeys")
+    }.iter().map(|(k, v)| {
+            // Each hotkey will have the key highlighted in dark gray and description in normal
+            // text with some spaces padding
+            vec![
+                Span::raw("  "),
+                Span::styled(k.to_string(), Style::new().fg(Color::DarkGray).reversed()),
+                Span::raw(format!(" {}", v)),
+            ]
+        }).flatten().collect();
+    // render it
+    frame.render_widget(Line::from(hotkey_spans), chunks[1]);
 }

@@ -1,5 +1,6 @@
 use crate::app::{App, AppResult, AppState};
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use tui_textarea::{Key, Input};
 
 /// Handles the key events and updates the state of [`App`].
 pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
@@ -7,7 +8,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // of mode
 
     // As long as the state is not Renaming, check the globals first
-    if !matches!(app.state, AppState::Renaming(_)) {
+    if !matches!(app.state, AppState::Renaming) {
         match key_event.code {
             // Exit application on `ESC` or `q`
             KeyCode::Char('q') => {
@@ -27,18 +28,18 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // Check hotkeys based on different app states that can handle different
     // keys
     match app.state {
-        AppState::Sessions => {
+        AppState::Sessions | AppState::SessionsSearch(_) => {
             match key_event.code {
                 // Move up the list
-                KeyCode::Char('k') => {
+                KeyCode::Char('k') | KeyCode::Up => {
                     app.selected_session = app.selected_session.checked_sub(1).unwrap_or(0)
                 }
                 // Move down the list
-                KeyCode::Char('j') => {
+                KeyCode::Char('j') | KeyCode::Down => {
                     app.selected_session = (app.selected_session + 1).min(app.sessions.len()-1)
                 }
                 // Enter/select to attach
-                KeyCode::Enter => {
+                KeyCode::Enter | KeyCode::Char('a') => {
                     let name = app.sessions[app.selected_session].0.clone();
                     app.attach(name, true);
                 }
@@ -53,7 +54,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 KeyCode::Char('x') => {
                     // Start the delete process for the currently selected
                     // session
-                    app.confirm_delete(app.selected_session);
+                    app.confirm_delete();
                 }
                 KeyCode::Char('N') => {
                     // Create and attach a new session. If the user is currently
@@ -69,7 +70,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 _ => {}
             }
         },
-        AppState::Deleting(_) => {
+        AppState::Deleting => {
             match key_event.code {
                 KeyCode::Char('y') => {
                     // Delete the highlighted session
@@ -82,32 +83,27 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 _ => (),
             }
         },
-        AppState::Renaming(_) => {
+        AppState::Renaming => {
             // If the renaming dialog is up, user can either escape out or hit enter to trigger
             // rename. Any valid symbols for a tmux session name should be pushed onto the rename
             // string
-            match key_event.code {
-                KeyCode::Esc => {
-                    todo!("Dismiss renaming and cancel");
-                },
-                KeyCode::Enter => {
-                    todo!("Confirm and implement rename");
-                },
-                KeyCode::Backspace => {
-                    // Push this on
-                    if let Some(ref mut name) = app.new_session_name {
-                        name.pop();
+            match key_event.into() {
+                Input { key: Key::Enter, .. } => {
+                    // Read the textarea contents and use it to rename the session
+                    if let Some(textarea) = &app.new_session_ta {
+                        let rename = &textarea.lines()[0].to_string();
+                        app.rename(rename);
                     }
                 },
-                KeyCode::Char(c) => {
-                    // Push this on
-                    if let Some(ref mut name) = app.new_session_name {
-                        name.push(c);
-                    } else {
-                        app.new_session_name = Some(c.to_string());
-                    }
+                Input { key: Key::Esc, .. } => {
+                    app.dismiss_all();
                 },
-                _ => (),
+                input => {
+                    if let Some(ref mut textarea) = app.new_session_ta {
+                        // returns true if the input modified the text contents
+                        textarea.input(input);
+                    }
+                }
             }
         },
         AppState::WarnNested => {
