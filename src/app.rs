@@ -72,26 +72,25 @@ impl<'a> Default for App<'a> {
             matching_rows: vec![],
             hotkeys: [
                 (AppState::Sessions, [
-                    ("Q", "Quit"),
-                    ("A", "Attach Session"),
-                    ("R", "Rename"),
-                    ("J", "Down"),
-                    ("K", "Up"),
-                    ("X", "Delete"),
+                    ("q", "Quit"),
+                    ("a", "Attach Session"),
+                    ("r", "Rename"),
+                    ("n", "New"),
+                    ("x", "Delete"),
                     ("/", "Search"),
                 ].iter().cloned().collect()),
                 (AppState::Deleting, [
-                    ("Q", "Quit"),
+                    ("q", "Quit"),
                     ("Esc", "Back"),
-                    ("Y", "Delete"),
-                    ("N", "Cancel"),
+                    ("y", "Delete"),
+                    ("n", "Cancel"),
                 ].iter().cloned().collect()),
                 (AppState::Renaming, [
                     ("Esc", "Back"),
                     ("Enter", "Rename"),
                 ].iter().cloned().collect()),
                 (AppState::WarnNested, [
-                    ("Q", "Quit"),
+                    ("q", "Quit"),
                     ("Any", "Dismiss"),
                 ].iter().cloned().collect()),
                 (AppState::SessionsSearch, [
