@@ -42,7 +42,7 @@ pub struct App<'a> {
     /// The application state
     pub state: AppState,
     /// Rename string
-    pub new_session_ta: Option<TextArea<'a>>,
+    pub rename_session_ta: Option<TextArea<'a>>,
     /// Rename string
     pub search_session_ta: Option<TextArea<'a>>,
     /// The row selected by a search operation
@@ -62,7 +62,7 @@ impl<'a> Default for App<'a> {
             selected_session: 0,
             on_exit: ExitAction::None,
             state: AppState::Sessions,
-            new_session_ta: None,
+            rename_session_ta: None,
             search_session_ta: None,
             search_session_selected: None,
             matching_rows: vec![],
@@ -181,7 +181,7 @@ impl<'a> App<'a> {
                 .title(" New Session Name ")
                 .style(Style::default().bg(Color::DarkGray))
         );
-        self.new_session_ta = Some(textarea);
+        self.rename_session_ta = Some(textarea);
         self.state = AppState::Renaming;
     }
 
@@ -197,7 +197,7 @@ impl<'a> App<'a> {
 
     /// Return to the sessions view
     pub fn dismiss_all(&mut self) {
-        self.new_session_ta = None;
+        self.rename_session_ta = None;
         self.search_session_ta = None;
         self.state = AppState::Sessions;
     }

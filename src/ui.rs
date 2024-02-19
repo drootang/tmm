@@ -186,7 +186,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         }
         AppState::Renaming => {
             // Render text input dialog to get the desired new name
-            if let Some(textarea) = &app.new_session_ta {
+            if let Some(textarea) = &app.rename_session_ta {
                 display_prompt_centered(frame, &chunks[0], textarea)
             }
         }

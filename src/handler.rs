@@ -143,7 +143,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
             match key_event.into() {
                 Input { key: Key::Enter, .. } => {
                     // Read the textarea contents and use it to rename the session
-                    if let Some(textarea) = &app.new_session_ta {
+                    if let Some(textarea) = &app.rename_session_ta {
                         let rename = &textarea.lines()[0].to_string();
                         app.rename(rename);
                     }
@@ -152,7 +152,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     app.dismiss_all();
                 },
                 input => {
-                    if let Some(ref mut textarea) = app.new_session_ta {
+                    if let Some(ref mut textarea) = app.rename_session_ta {
                         // returns true if the input modified the text contents
                         textarea.input(input);
                     }
