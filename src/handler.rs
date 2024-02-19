@@ -62,6 +62,9 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 KeyCode::Char('g') => {
                     app.selected_session = 0;
                 }
+                KeyCode::Char(' ') => {
+                    app.refresh();
+                }
                 // Jump to top end of list
                 KeyCode::Char('G') => {
                     app.selected_session = app.sessions.len() - 1;
