@@ -1,5 +1,5 @@
 use std::{
-    collections::HashMap, env, error, process::Command, str::from_utf8
+    collections::{HashMap, HashSet}, env, error, process::Command, str::from_utf8
 };
 use tui_textarea::TextArea;
 use ratatui::style::{Color, Style};
@@ -16,6 +16,7 @@ pub enum AppState {
     Deleting,
     Renaming,
     WarnNested,
+    NewSession,
 }
 
 #[derive(Debug)]
@@ -41,9 +42,11 @@ pub struct App<'a> {
     pub selected_session: usize,
     /// The application state
     pub state: AppState,
-    /// Rename string
+    /// Rename prompt
     pub rename_session_ta: Option<TextArea<'a>>,
-    /// Rename string
+    /// New session name prompt
+    pub new_session_ta: Option<TextArea<'a>>,
+    /// Search prompt
     pub search_session_ta: Option<TextArea<'a>>,
     /// The row selected by a search operation
     pub search_session_selected: Option<usize>,
@@ -62,6 +65,7 @@ impl<'a> Default for App<'a> {
             selected_session: 0,
             on_exit: ExitAction::None,
             state: AppState::Sessions,
+            new_session_ta: None,
             rename_session_ta: None,
             search_session_ta: None,
             search_session_selected: None,
@@ -144,18 +148,30 @@ impl<'a> App<'a> {
             .args(["ls"])
             .output()
             .expect("failed to refresh tmux");
-        if let Ok(stdout) = from_utf8(&output.stdout) {
-            self.sessions = stdout.lines().filter_map(|line| {
-                let mut parts = line.split(":");
-                if let Some(name) = parts.next() {
-                    // Get the name and remaining description
-                    let remainder = parts.collect::<Vec<&str>>().join(" ");
-                    Some((name.to_owned(), remainder))
-                } else {
-                    None
-                }
-            }).collect();
+        let Ok(stdout) = from_utf8(&output.stdout) else { return };
+        // Since the list can change between refreshes, need to get the name of the currently
+        // highlighted session and then re-select that row after the list is updated.
+        let selected_name = self.sessions.get(self.selected_session).map_or(None, |x| Some(x.0.to_owned()));
+        self.sessions = stdout.lines().filter_map(|line| {
+            let mut parts = line.split(":");
+            if let Some(name) = parts.next() {
+                // Get the name and remaining description
+                let remainder = parts.collect::<Vec<&str>>().join(" ");
+                Some((name.to_owned(), remainder))
+            } else {
+                None
+            }
+        }).collect();
+        // Find the selected_name in the new session list and select it. If it's not there, do not
+        // change the selected row (e.g., on a rename, the new session will not be present, but
+        // want to maintain the selection)
+        if let Some(selected_name) = selected_name {
+            if let Some(idx) = self.sessions.iter().position(|(name, _)| name == &selected_name) {
+                self.selected_session = idx
+            }
         }
+        // Ensure the selected session is legal
+        self.selected_session = self.selected_session.max(0).min(self.sessions.len()-1);
     }
 
     /// Get the maximum width of all session names
@@ -215,7 +231,7 @@ impl<'a> App<'a> {
         let proc = Command::new("tmux")
             .args(["rename-session", "-t", name, rename])
             .output()
-            .expect(format!("failed to rename tmux session {}", name).as_str());
+            .expect(format!("failed to rename tmux session: {}", name).as_str());
         if !proc.status.success() {
             panic!("This is the failure message: {}", std::str::from_utf8(&proc.stderr).unwrap());
             // TODO: display popup with error
@@ -241,16 +257,61 @@ impl<'a> App<'a> {
         self.dismiss_all();
     }
 
-    /// Start a new session and attach it if possible. If attach is expected to
-    /// fail, refresh list instead and stay in tmm
-    pub fn new_session(&mut self) {
-        // Create a new session
-        if Self::is_nested() {
-            self.state = AppState::WarnNested;
+    pub fn confirm_new_session(&mut self) {
+        // Create the textarea and switch to renaming state
+        let mut textarea = TextArea::default();
+        textarea.set_cursor_line_style(Style::default());
+        textarea.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" New Session Name ")
+                .style(Style::default().bg(Color::DarkGray))
+        );
+        self.new_session_ta = Some(textarea);
+        self.state = AppState::NewSession;
+    }
+
+    /// Create a new session
+    pub fn new_session(&mut self, name: Option<&str>) {
+        if let Some(name) = name {
+            // Create the named session, and highlight it in the list
+            let proc = Command::new("tmux")
+                .args(["new-session", "-d", "-s", name])
+                .output()
+                .expect(format!("failed to create new tmux session: {}", name).as_str());
+            if !proc.status.success() {
+                panic!("This is the failure message: {}", std::str::from_utf8(&proc.stderr).unwrap());
+                // TODO: display popup with error
+            }
+            // TODO: one common failure mode might be that the name already exists, e.g,
+            // "duplicate session: <name>"
+
+            // Highlight the newly created session. Tmux may modify characters that are provided
+            // based on illegal tmux session names (e.g., 8.1 -> 8_1). It does not report this
+            // modification, so we should discover the new session name using the set difference of
+            // the new list of sessions and the old list of sessions.
+            // Before refreshing, build a set of the current names
+            let old_session_names: HashSet<String> = self.sessions.iter().map(|(name, _)| name.to_owned()).collect();
+            self.refresh();
+            let new_session_names: HashSet<String> = self.sessions.iter().map(|(name, _)| name.to_owned()).collect();
+            if let Some(new_session_name) = new_session_names.difference(&old_session_names).next() {
+                // We were able to find the new session name
+                if let Some(idx) = self.sessions.iter().position(|(name, _)| name == new_session_name) {
+                    self.selected_session = idx;
+                }
+            } else {
+                // New session name not found for some reason. Do not change the selection.
+            }
+            self.dismiss_all();
         } else {
-            // Exit and attach new session
-            self.running = false;
-            self.on_exit = ExitAction::NewSession;
+            // Create a new, unnamed session and immediately exit and attach it
+            if Self::is_nested() {
+                self.state = AppState::WarnNested;
+            } else {
+                // Exit and attach new session
+                self.running = false;
+                self.on_exit = ExitAction::NewSession;
+            }
         }
     }
 }

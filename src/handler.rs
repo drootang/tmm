@@ -7,20 +7,23 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
     // Check global hotkeys first and always immediately handle them regardless
     // of mode
 
-    // As long as the state is not Renaming, check the globals first
-    if !matches!(app.state, AppState::Renaming | AppState::SessionsSearch) {
+    // TRUE globals - no matter what the mode always respond to these first
+    match key_event.into() {
+        // Exit application on `Ctrl-C`
+        Input { key: Key::Char('c') | Key::Char('C'), ctrl: true, ..} =>  {
+            app.quit();
+            return Ok(());
+        }
+        _ => ()
+    }
+
+    // As long as the state is not one of the prompting states, check for globals
+    if !matches!(app.state, AppState::Renaming | AppState::SessionsSearch | AppState::NewSession) {
         match key_event.code {
             // Exit application on `ESC` or `q`
             KeyCode::Char('q') => {
                 app.quit();
                 return Ok(());
-            }
-            // Exit application on `Ctrl-C`
-            KeyCode::Char('c') | KeyCode::Char('C') => {
-                if key_event.modifiers == KeyModifiers::CONTROL {
-                    app.quit();
-                    return Ok(());
-                }
             }
             _ => ()
         }
@@ -46,6 +49,8 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 KeyCode::Char('n') => { // C-n
                     if key_event.modifiers == KeyModifiers::CONTROL {
                         app.selected_session = (app.selected_session + 1).min(app.sessions.len()-1)
+                    } else {
+                        app.confirm_new_session();
                     }
                 }
                 // Enter/select to attach
@@ -70,7 +75,7 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                     // Create and attach a new session. If the user is currently
                     // in a tmux session so the attach would fail, instead of
                     // attempting attach, just refresh the list
-                    app.new_session();
+                    app.new_session(None);
                 }
                 KeyCode::Char('r') => {
                     app.confirm_rename();
@@ -154,6 +159,26 @@ pub fn handle_key_events(key_event: KeyEvent, app: &mut App) -> AppResult<()> {
                 input => {
                     if let Some(ref mut textarea) = app.rename_session_ta {
                         // returns true if the input modified the text contents
+                        textarea.input(input);
+                    }
+                }
+            }
+        },
+        AppState::NewSession => {
+            // Similar to Renaming interface except for final result
+            match key_event.into() {
+                Input { key: Key::Enter, .. } => {
+                    // Read the textarea contents and use it to create a new session
+                    if let Some(textarea) = &app.new_session_ta {
+                        let name = &textarea.lines()[0].to_string();
+                        app.new_session(Some(name));
+                    }
+                },
+                Input { key: Key::Esc, .. } => {
+                    app.dismiss_all();
+                },
+                input => {
+                    if let Some(ref mut textarea) = app.new_session_ta {
                         textarea.input(input);
                     }
                 }

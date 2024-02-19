@@ -190,6 +190,12 @@ pub fn render(app: &mut App, frame: &mut Frame) {
                 display_prompt_centered(frame, &chunks[0], textarea)
             }
         }
+        AppState::NewSession => {
+            // Render text input dialog to get the desired new name
+            if let Some(textarea) = &app.new_session_ta {
+                display_prompt_centered(frame, &chunks[0], textarea)
+            }
+        }
         AppState::SessionsSearch => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.search_session_ta {
