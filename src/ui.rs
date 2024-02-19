@@ -35,17 +35,29 @@ fn display_popup_centered(frame: &mut Frame, rect: &Rect, title: &str, message: 
     frame.render_widget(msg, area);
 }
 
-fn display_prompt_centered(frame: &mut Frame, rect: &Rect, textarea: &TextArea) {
+fn display_prompt_centered(frame: &mut Frame, rect: &Rect, textarea: &TextArea, title: &str) {
     // TODO: accept proper trait for spans, text, etc so it can be styled
     // Compute proper size of popup. Add 4 to account for border and padding.
+    let prompt = " > ";
+    let plen = prompt.len() as u16;
+
     let width: u16 = (textarea.lines()[0].len()+4).max(18).max((rect.width/2) as usize) as u16;
     let height: u16 = 3;
     // Find the center of the provided rect
     let x = (2 * rect.x + rect.width - width)/2;
     let y = (2 * rect.y + rect.height - height)/2;
     let area = Rect::new(x, y, width, height);
+
+    let block = Block::bordered().title(format!(" {} ", title)).style(Style::default().bg(Color::DarkGray));
     frame.render_widget(Clear, area);
-    frame.render_widget(textarea.widget(), area);
+    // Get the inner area of the block that will be shared by the prompt and the textarea
+    let inner_area = block.inner(area);
+    let prompt_area = Rect{width: plen, ..inner_area};
+    let ta_area = Rect{x: inner_area.x + plen, width: inner_area.width - plen, ..inner_area};
+    // Render the block, prompt, and the textarea
+    frame.render_widget(block, area);
+    frame.render_widget(Span::styled(prompt, Style::default().fg(Color::Cyan)), prompt_area);
+    frame.render_widget(textarea.widget(), ta_area);
 }
 
 /// Renders the user interface widgets.
@@ -187,13 +199,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         AppState::Renaming => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.rename_session_ta {
-                display_prompt_centered(frame, &chunks[0], textarea)
+                display_prompt_centered(frame, &chunks[0], textarea, "New Session Name")
             }
         }
         AppState::NewSession => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.new_session_ta {
-                display_prompt_centered(frame, &chunks[0], textarea)
+                display_prompt_centered(frame, &chunks[0], textarea, "New Session Name")
             }
         }
         AppState::SessionsSearch => {

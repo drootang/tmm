@@ -190,12 +190,6 @@ impl<'a> App<'a> {
         // Create the textarea and switch to renaming state
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" New Session Name ")
-                .style(Style::default().bg(Color::DarkGray))
-        );
         self.rename_session_ta = Some(textarea);
         self.state = AppState::Renaming;
     }
@@ -260,12 +254,6 @@ impl<'a> App<'a> {
         // Create the textarea and switch to renaming state
         let mut textarea = TextArea::default();
         textarea.set_cursor_line_style(Style::default());
-        textarea.set_block(
-            Block::default()
-                .borders(Borders::ALL)
-                .title(" New Session Name ")
-                .style(Style::default().bg(Color::DarkGray))
-        );
         self.new_session_ta = Some(textarea);
         self.state = AppState::NewSession;
     }
