@@ -150,9 +150,9 @@ pub fn render(app: &mut App, frame: &mut Frame) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Min(4 + app.sessions.len() as u16),
+            Constraint::Fill(1),
+            Constraint::Max(4 + app.sessions.len() as u16),
             Constraint::Length(1),
-            Constraint::Percentage(100),
         ])
         .split(frame.size());
 
@@ -172,7 +172,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             .highlight_spacing(HighlightSpacing::Always)
             .repeat_highlight_symbol(false)
             .direction(ListDirection::TopToBottom),
-        chunks[0], &mut state
+        chunks[1], &mut state
     );
     
     /**********/
@@ -185,13 +185,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             // Get the name of the session
             let (name, _) = &app.sessions[app.selected_session];
             // Center the popup in the sessions rect
-            display_popup_centered(frame, &chunks[0], "Confirm Delete",
+            display_popup_centered(frame, &chunks[1], "Confirm Delete",
                 format!("Are you sure you want to delete {}?", name).as_str(),
                 " [Y]es / [N]o"
             )
         }
         AppState::WarnNested => {
-            display_popup_centered(frame, &chunks[0], "Error",
+            display_popup_centered(frame, &chunks[1], "Error",
                 "Cannot create nested session.",
                 " [D]ismiss"
             )
@@ -199,13 +199,13 @@ pub fn render(app: &mut App, frame: &mut Frame) {
         AppState::Renaming => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.rename_session_ta {
-                display_prompt_centered(frame, &chunks[0], textarea, "New Session Name")
+                display_prompt_centered(frame, &chunks[1], textarea, "New Session Name")
             }
         }
         AppState::NewSession => {
             // Render text input dialog to get the desired new name
             if let Some(textarea) = &app.new_session_ta {
-                display_prompt_centered(frame, &chunks[0], textarea, "New Session Name")
+                display_prompt_centered(frame, &chunks[1], textarea, "New Session Name")
             }
         }
         AppState::SessionsSearch => {
@@ -213,7 +213,7 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             if let Some(textarea) = &app.search_session_ta {
                 // Need to render the search prompt immediately after the sessions list
                 // Compute the rect
-                let Rect{x, y, width, height} = chunks[0];
+                let Rect{x, y, width, height} = chunks[1];
                 let prompt_rect = Rect::new(x+2, y+height-2, width-2, 1);
                 let search_rect = Rect::new(x+4, y+height-2, width-4, 1);
                 frame.render_widget(Clear, search_rect);
@@ -245,5 +245,5 @@ pub fn render(app: &mut App, frame: &mut Frame) {
             ]
         }).flatten().collect();
     // render it
-    frame.render_widget(Line::from(hotkey_spans), chunks[1]);
+    frame.render_widget(Line::from(hotkey_spans), chunks[2]);
 }
