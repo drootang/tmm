@@ -38,9 +38,14 @@ fn main() -> AppResult<()> {
     match app.on_exit {
         ExitAction::AttachSession(name, detach_others) => {
             let mut cmd = exec::Command::new("tmux");
-            cmd.arg("a");
-            if detach_others {
-                cmd.arg("-d");
+            if App::is_nested() {
+                // If currently nested, use switch-client instead of attach
+                cmd.arg("switch-client");
+            } else {
+                cmd.arg("attach-session");
+                if detach_others {
+                    cmd.arg("-d");
+                }
             }
             let err = cmd.arg("-t").arg(name.as_str()).exec();
             panic!("{}", err);

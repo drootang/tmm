@@ -121,12 +121,8 @@ impl<'a> App<'a> {
     }
 
     pub fn attach(&mut self, name: String, detach_others: bool) {
-        if Self::is_nested() {
-            self.state = AppState::WarnNested;
-        } else {
-            self.running = false;
-            self.on_exit = ExitAction::AttachSession(name.clone(), detach_others);
-        }
+        self.running = false;
+        self.on_exit = ExitAction::AttachSession(name.clone(), detach_others);
     }
 
     pub fn increment_counter(&mut self) {
@@ -277,6 +273,12 @@ impl<'a> App<'a> {
             // based on illegal tmux session names (e.g., 8.1 -> 8_1). It does not report this
             // modification, so we should discover the new session name using the set difference of
             // the new list of sessions and the old list of sessions.
+            //
+            // TODO: if the user creates new sessions once the new-session procedure has started in
+            // tmm, multiple new sessions will appear in this set difference. Use fuzzy-matching to
+            // find the best match for the session name among the new sessions to give the best
+            // changes of highlighting the correct new session.
+            //
             // Before refreshing, build a set of the current names
             let old_session_names: HashSet<String> = self.sessions.iter().map(|(name, _)| name.to_owned()).collect();
             self.refresh();
@@ -291,14 +293,9 @@ impl<'a> App<'a> {
             }
             self.dismiss_all();
         } else {
-            // Create a new, unnamed session and immediately exit and attach it
-            if Self::is_nested() {
-                self.state = AppState::WarnNested;
-            } else {
-                // Exit and attach new session
-                self.running = false;
-                self.on_exit = ExitAction::NewSession;
-            }
+            // Exit and attach new session
+            self.running = false;
+            self.on_exit = ExitAction::NewSession;
         }
     }
 }
