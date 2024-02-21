@@ -1,14 +1,21 @@
-## Simple template
+# `tmm`
 
-The simple template will create the following project structure:
+`tmm` is a Textual User Interface (TUI) to manage `tmux` sessions
 
-```text
-src/
-├── app.rs     -> holds the state and application logic
-├── event.rs   -> handles the terminal events (key press, mouse click, resize, etc.)
-├── handler.rs -> handles the key press events and updates the application
-├── lib.rs     -> module definitions
-├── main.rs    -> entry-point
-├── tui.rs     -> initializes/exits the terminal interface
-└── ui.rs      -> renders the widgets / UI
-```
+## Installation
+
+## Usage
+
+Running `tmm` will present you with a list of active tmux sessions on your current system. Use `j`/`k` or `up`/`down` to scroll through the sessions and hit `Enter` to attach the highlighted session. If you are in a tmux session already, the current session will *switch* to the selected session.
+
+The list of sessions is searchable/filterable.
+
+Various other actions are available through displayed hotkeys:
+
+- Rename session
+- Delete session
+- Create (and optionally attach) a new named session
+
+## NOTES
+
+`tmm` is written in [Rust](https://www.rust-lang.org/) and uses [Ratatui](https://ratatui.rs/) to implement the TUI.
