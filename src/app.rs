@@ -3,7 +3,6 @@ use std::{
 };
 use tui_textarea::TextArea;
 use ratatui::style::{Color, Style};
-use ratatui::widgets::*;
 use indexmap::IndexMap;
 
 /// Application result type.

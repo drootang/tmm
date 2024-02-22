@@ -26,13 +26,16 @@ struct Args {
 }
 
 /// Attach or switch to a session name and exit
-fn attach(name: &str) -> ! {
+fn attach(name: &str, detach_others: bool) -> ! {
     let mut cmd = exec::Command::new("tmux");
     if App::is_nested() {
         // If currently nested, use switch-client instead of attach
         cmd.arg("switch-client");
     } else {
         cmd.arg("attach-session").arg("-d");
+        if detach_others {
+            cmd.arg("-d");
+        }
     }
     let err = cmd.arg("-t").arg(name).exec();
     panic!("{}", err);
@@ -44,7 +47,7 @@ fn main() -> AppResult<()> {
 
     let args = Args::parse();
     if let Some(session_name) = args.session_name {
-        attach(&session_name);
+        attach(&session_name, true);
     }
 
     // Initialize the terminal user interface.
@@ -71,7 +74,7 @@ fn main() -> AppResult<()> {
 
     match app.on_exit {
         ExitAction::AttachSession(name, detach_others) => {
-            attach(&name);
+            attach(&name, detach_others);
         },
         ExitAction::NewSession => {
             let err = exec::Command::new("tmux")
