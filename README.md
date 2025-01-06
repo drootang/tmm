@@ -2,6 +2,9 @@
 
 `tmm` is a Textual User Interface (TUI) to manage `tmux` sessions
 
+![tmm_screenshot](https://github.com/user-attachments/assets/e441d601-7bcb-4fe3-8421-28b20048a047)
+
+
 ## Installation
 
 Clone the repo and run `cargo build --release` in the repo directory. Copy the resulting target from `./target/release/tmm` into a directory on your `$PATH`.
